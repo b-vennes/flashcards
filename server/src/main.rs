@@ -1,75 +1,62 @@
+mod logger;
+mod command;
+mod query;
+mod redis_connector;
+mod models;
+
+use logger::Logger;
+use models::{Card, CardQuery};
+use command::CardCommander;
+use query::CardRetriever;
+use redis_connector::RedisConnector;
+
 use actix_web::{web, App, HttpResponse, HttpServer, Responder, get, post};
-use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-struct Deck {
-    key: String,
-    value: String
-}
-
-#[get("/decks/{deck}")]
-async fn get_deck(path: web::Path<(String,)>, data_access: web::Data<DataAccess>) -> impl Responder {
-    let decks = data_access.get_deck(&path.0);
-    HttpResponse::Ok().json(decks)
-}
-
-#[post("/decks")]
-async fn set_deck(deck: web::Json<Deck>, logger: web::Data<Logger>, data_access: web::Data<DataAccess>) -> impl Responder {
-    data_access.set_deck(&deck.key, &deck.value);
-    HttpResponse::Ok()
-}
-
-struct DataAccess {
-    redis_client: redis::Client,
-    logger: Logger
-}
-
-impl DataAccess {
-    fn new(logger: Logger, redis_client: redis::Client) -> Self {
-        DataAccess {
-            logger: logger,
-            redis_client: redis_client,
+#[get("/cards/query")]
+async fn query_cards(
+            query: web::Json<CardQuery>,
+            card_retriever: web::Data<CardRetriever>,
+            logger: web::Data<Logger>) -> impl Responder {
+    match card_retriever.query(&query) {
+        Ok(cards) => HttpResponse::Ok().json(cards),
+        Err(error) => {
+            logger.log_error(format!("Error during card query: {}", error));
+            HttpResponse::InternalServerError().body(error)
         }
     }
-
-    fn get_deck(&self, deck_key: &String) -> String {
-        let mut redis_connection = self.get_connection();
-        
-        redis::cmd("GET").arg(deck_key).query(&mut redis_connection).expect("Errored during query")
-    }
-
-    fn set_deck(&self, deck_key: &String, deck_value: &String) {
-        let mut redis_connection = self.get_connection();
-
-        redis::cmd("SET").arg(deck_key).arg(deck_value).execute(&mut redis_connection);
-    }
-
-    fn get_connection(&self) -> redis::Connection {
-        self.redis_client.get_connection().expect("Failed to get redis connection.")
-    }
 }
 
-struct Logger {}
-
-impl Logger {
-    fn log_info(message: &String) {
-        println!("{}", message);
+#[post("/cards")]
+async fn add_card(
+            card: web::Json<Card>,
+            card_commander: web::Data<CardCommander>, 
+            logger: web::Data<Logger>) -> impl Responder {
+    match card_commander.add(&card) {
+        Ok(_) => HttpResponse::NoContent().body(""),
+        Err(error) => {
+            logger.log_error(format!("Error during add card command: {}", error));
+            HttpResponse::InternalServerError().body(error)
+        }
     }
 }
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
-        let redis_client = redis::Client::open("redis://127.0.0.1:6379").expect("Unable to open redis client.");
         let logger = Logger {};
+        let redis_client = redis::Client::open("redis://127.0.0.1:6379").expect("Unable to open redis client.");
 
-        let data_access = DataAccess::new(logger, redis_client);
+        let redis_connector = RedisConnector::new(logger.clone(), redis_client.clone());
+        
+        let card_commander = CardCommander::new(logger.clone(), redis_connector.clone());
+        let card_retriever = CardRetriever::new(logger.clone(), redis_connector.clone());
 
         App::new()
-            .service(get_deck)
-            .service(set_deck)
-            .data(data_access)
-            .data(Logger {})
+            .service(query_cards)
+            .service(add_card)
+            .data(card_commander)
+            .data(card_retriever)
+            .data(logger.clone())
     })
     .bind("127.0.0.1:8088")?
     .run()
