@@ -3,12 +3,14 @@ use super::redis_connector::RedisConnector;
 use super::models::Card;
 use serde_json::{to_string};
 
+/// Processes flashcard commands.
 pub struct CardCommander {
     logger: Logger,
     redis_connector: RedisConnector,
 }
 
 impl CardCommander {
+    /// Initializes a new instance of CardCommander
     pub fn new(logger: Logger, redis_connector: RedisConnector) -> Self {
         CardCommander {
             logger: logger,
@@ -16,6 +18,7 @@ impl CardCommander {
         }
     }
 
+    /// Adds a new Card.
     pub fn add(&self, card: &Card) -> Result<String, String> {
         let mut redis_connection = self.redis_connector.get_connection();
 

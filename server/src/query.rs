@@ -4,12 +4,14 @@ use super::redis_connector::RedisConnector;
 use serde_json::{from_str};
 use redis::RedisError;
 
+/// Processes flashcard queries.
 pub struct CardRetriever {
     logger: Logger,
     redis_connector: RedisConnector,
 }
 
 impl CardRetriever {
+    /// Instantiates a new instance.
     pub fn new(logger: Logger, redis_connector: RedisConnector) -> Self {
         CardRetriever {
             logger: logger,
@@ -17,6 +19,7 @@ impl CardRetriever {
         }
     }
 
+    /// Queries the flashcard data set.
     pub fn query(&self, query: &CardQuery) -> Result<DeckView, String> {
         let mut redis_connection = self.redis_connector.get_connection();
 
