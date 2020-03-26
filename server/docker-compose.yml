@@ -2,4 +2,4 @@ redis:
     image: redis
     container_name: flashcards-cache
     ports:
-      - 9090:6379
+      - 6379:6379

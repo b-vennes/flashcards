@@ -11,10 +11,11 @@ use query::CardRetriever;
 use redis_connector::RedisConnector;
 
 use actix_web::{web, App, HttpResponse, HttpServer, Responder, get, post};
+use actix_cors::Cors;
 
 #[get("/cards/query")]
 async fn query_cards(
-            query: web::Json<CardQuery>,
+            query: web::Query<CardQuery>,
             card_retriever: web::Data<CardRetriever>,
             logger: web::Data<Logger>) -> impl Responder {
     match card_retriever.query(&query) {
@@ -52,6 +53,11 @@ async fn main() -> std::io::Result<()> {
         let card_retriever = CardRetriever::new(logger.clone(), redis_connector.clone());
 
         App::new()
+            .wrap(
+                Cors::new()
+                    .allowed_methods(vec!["GET", "POST"])
+                    .finish(),
+            )
             .service(query_cards)
             .service(add_card)
             .data(card_commander)

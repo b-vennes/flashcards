@@ -4,14 +4,16 @@
 
     let showDefinition = false;
 
-    let toggleDefinition = () => showDefinition = !showDefinition; 
+    let toggleDefinition = () => showDefinition = !showDefinition;
 </script>
 
-<h2>{word}</h2>
-<p>{word}</p>
+<div>
+    <h3>{word}</h3>
+    <p>{word}</p>
 
-<button on:click={toggleDefinition}>Show Definition</button>
+    <button class="waves-effect waves-light btn" on:click={toggleDefinition}>Show Definition</button>
 
-{#if showDefinition}
-    <h3>{definition}</h3>
-{/if}
+    {#if showDefinition}
+        <p>{definition}<p/>
+    {/if}
+</div>
